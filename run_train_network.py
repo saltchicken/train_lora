@@ -26,7 +26,7 @@ def run_training(input, output, model, repeat, instance, class_name, reg='', reg
             
             # Use shutil.move() to move the file
             shutil.copy(source_file, destination_file)
-            print(f"Copied: {source_file} -> {destination_file}")
+            # print(f"Copied: {source_file} -> {destination_file}")
     
     for file in image_files:
         source_file = os.path.join(input, file)
@@ -34,7 +34,7 @@ def run_training(input, output, model, repeat, instance, class_name, reg='', reg
         
         # Use shutil.move() to move the file
         shutil.copy(source_file, destination_file)
-        print(f"Copied: {source_file} -> {destination_file}")
+        # print(f"Copied: {source_file} -> {destination_file}")
     
     ffmpeg_command = [
         f'{kohya_directory}venv/Scripts/accelerate', 'launch', '--num_cpu_threads_per_process=2', f'{kohya_directory}train_network.py',
@@ -50,7 +50,7 @@ def run_training(input, output, model, repeat, instance, class_name, reg='', reg
         f'--output_name={output}',
         '--lr_scheduler_num_cycles=10', '--no_half_vae', 
         '--learning_rate=0.0004', '--lr_scheduler=constant', 
-        '--train_batch_size=1', '--max_train_steps=500', 
+        '--train_batch_size=1', '--max_train_epochs=10',
         '--save_every_n_epochs=1', 
         '--mixed_precision=bf16', '--save_precision=bf16', 
         '--cache_latents', '--cache_latents_to_disk', 
