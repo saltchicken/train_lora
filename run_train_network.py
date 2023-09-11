@@ -1,6 +1,6 @@
-import argparse, configparser, subprocess, os, shutil
+import argparse, configparser, subprocess, os, shutil, glob
 
-def run_training(input, output, model, repeat, instance, class_name, reg='', reg_repeat=1):
+def run_training(input, output, model, repeat, instance, class_name, reg='', reg_repeat=1, sample_prompt='', WD14 = False):
     config = configparser.ConfigParser()
     config.read('config.ini')
     kohya_directory = config.get('Directories', 'kohya_directory')
@@ -15,6 +15,9 @@ def run_training(input, output, model, repeat, instance, class_name, reg='', reg
     os.mkdir(f'{input}lora/img/{repeat}_{instance} {class_name}')
     os.mkdir(f'{input}lora/model')
     os.mkdir(f'{input}lora/log')
+    if sample_prompt != '':
+        with open(f'{input}lora/prompt.txt', 'w') as file:
+            file.write(sample_prompt)
     if reg:
         print('Preparing regularization')
         reg_files = os.listdir(reg)
@@ -35,6 +38,28 @@ def run_training(input, output, model, repeat, instance, class_name, reg='', reg
         # Use shutil.move() to move the file
         shutil.copy(source_file, destination_file)
         # print(f"Copied: {source_file} -> {destination_file}")
+    
+    if WD14:    
+        WD14_command = [
+            f'{kohya_directory}venv/Scripts/accelerate', 'launch', f'{kohya_directory}finetune/tag_images_by_wd14_tagger.py', 
+            '--batch_size=8', '--general_threshold=0.35', '--character_threshold=0.35', '--caption_extension=.txt',
+            '--model=SmilingWolf/wd-v1-4-convnextv2-tagger-v2', '--max_data_loader_n_workers=2', '--debug',
+            '--remove_underscore', '--frequency_tags', f'{input}'
+        ]
+        
+        try:
+            subprocess.run(WD14_command, check=True)
+            print(f'WD14 complete.')
+        except subprocess.CalledProcessError as e:
+            print(f'Error during WD14: {e}')
+            
+            
+        txt_files = glob.glob(os.path.join(f'{input}', "*.txt"))
+        for txt_file in txt_files:
+            with open(txt_file, "r+") as file:
+                file_data = file.read()
+                file.seek(0, 0)
+                file.write(f'{instance} {class_name}, {file_data}')
     
     ffmpeg_command = [
         f'{kohya_directory}venv/Scripts/accelerate', 'launch', '--num_cpu_threads_per_process=2', f'{kohya_directory}train_network.py',
@@ -62,10 +87,17 @@ def run_training(input, output, model, repeat, instance, class_name, reg='', reg
         '--bucket_no_upscale', 
         '--noise_offset=0.0'
     ]
+    
+    if sample_prompt != '':
+        ffmpeg_command.extend([
+        '--sample_sampler=euler_a', 
+        f'--sample_prompts={input}lora/prompt.txt', 
+        '--sample_every_n_epochs=1'
+        ])
 
     try:
         subprocess.run(ffmpeg_command, check=True)
-        print(f'Conversion complete.')
+        print(f'KOHYA complete.')
     except subprocess.CalledProcessError as e:
         print(f'Error during conversion: {e}')
 
@@ -80,10 +112,12 @@ def main():
     parser.add_argument('-c', '--class_name', required=True, type=str, help='Class name of the LORA')
     parser.add_argument('--reg_dir', default='', type=str, help='Directory of regulatization images')
     parser.add_argument('--reg_repeat', default=1, type=str, help='Number of times to repeat regularization images')
+    parser.add_argument('--sample_prompt', default='', type=str, help='Sample prompt to run for the epochs')
+    parser.add_argument('--WD14', action='store_true', help='Use WD14 for captioning')
     
     args = parser.parse_args()
     
-    run_training(args.input, args.output, args.model, args.repeat, args.instance, args.class_name, args.reg_dir, args.reg_repeat)
+    run_training(args.input, args.output, args.model, args.repeat, args.instance, args.class_name, args.reg_dir, args.reg_repeat, args.sample_prompt, args.WD14)
         
 if __name__ == '__main__':
     main()
