@@ -60,10 +60,14 @@ def run_training(input, output, model, repeat, instance, class_name, reg='', reg
                 file_data = file.read()
                 file.seek(0, 0)
                 file.write(f'{instance} {class_name}, {file_data}')
+            # source_file = os.path.join(input, file)
+            destination_file = os.path.join(f'{input}lora/img/{repeat}_{instance} {class_name}/', os.path.basename(txt_file))
+            shutil.copy(txt_file, destination_file)
+            
     
     ffmpeg_command = [
         f'{kohya_directory}venv/Scripts/accelerate', 'launch', '--num_cpu_threads_per_process=2', f'{kohya_directory}train_network.py',
-        '--enable_bucket', '--min_bucket_reso=256', '--max_bucket_reso=2048', 
+        # '--enable_bucket', '--min_bucket_reso=256', '--max_bucket_reso=2048', 
         f'--pretrained_model_name_or_path={pretrained_model_name + model}',
         f'--train_data_dir={input}lora/img', 
         f'--reg_data_dir={input}lora/reg', 
@@ -78,6 +82,7 @@ def run_training(input, output, model, repeat, instance, class_name, reg='', reg
         '--train_batch_size=1', '--max_train_epochs=10',
         '--save_every_n_epochs=1', 
         '--mixed_precision=bf16', '--save_precision=bf16', 
+        '--caption_extension=.txt',
         '--cache_latents', '--cache_latents_to_disk', 
         '--optimizer_type=Adafactor', 
         '--optimizer_args', 'scale_parameter=False', 'relative_step=False', 'warmup_init=False', 
@@ -94,6 +99,8 @@ def run_training(input, output, model, repeat, instance, class_name, reg='', reg
         f'--sample_prompts={input}lora/prompt.txt', 
         '--sample_every_n_epochs=1'
         ])
+        
+    print(ffmpeg_command)
 
     try:
         subprocess.run(ffmpeg_command, check=True)
